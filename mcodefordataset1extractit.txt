@@ -1,0 +1,109 @@
+let
+    Source = Json.Document(
+        Web.Contents(
+            "https://archive-api.open-meteo.com/v1/archive",
+            [
+                Query = [
+                    latitude = "53.33",
+                    longitude = "-6.26",
+                    start_date = "2000-01-01",
+                    end_date = "2025-12-31",
+                    daily = "temperature_2m_max,temperature_2m_min,temperature_2m_mean,apparent_temperature_max,apparent_temperature_min,apparent_temperature_mean,relative_humidity_2m_max,relative_humidity_2m_min,relative_humidity_2m_mean,dew_point_2m_min,vapour_pressure_deficit_max,precipitation_sum,rain_sum,snowfall_sum,precipitation_hours,cloud_cover_mean,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,shortwave_radiation_sum,et0_fao_evapotranspiration",
+                    timezone = "Europe/Dublin"
+                ],
+                Headers = [
+                    #"Accept-Encoding" = "identity"
+                ]
+            ]
+        )
+    ),
+
+    // 🌍 Extract metadata
+    Latitude = Source[latitude],
+    Longitude = Source[longitude],
+    Elevation = Source[elevation],
+
+    // 📊 Daily data
+    DailyData = Source[daily],
+
+    Dates = DailyData[time],
+    TempMax = DailyData[temperature_2m_max],
+    TempMin = DailyData[temperature_2m_min],
+    TempMean = DailyData[temperature_2m_mean],
+    ApparentMax = DailyData[apparent_temperature_max],
+    ApparentMin = DailyData[apparent_temperature_min],
+    ApparentMean = DailyData[apparent_temperature_mean],
+    HumidityMax = DailyData[relative_humidity_2m_max],
+    HumidityMin = DailyData[relative_humidity_2m_min],
+    HumidityMean = DailyData[relative_humidity_2m_mean],
+    DewPoint = DailyData[dew_point_2m_min],
+    VapourPressure = DailyData[vapour_pressure_deficit_max],
+    Precip = DailyData[precipitation_sum],
+    Rain = DailyData[rain_sum],
+    Snow = DailyData[snowfall_sum],
+    PrecipHrs = DailyData[precipitation_hours],
+    CloudCover = DailyData[cloud_cover_mean],
+    WindSpeed = DailyData[wind_speed_10m_max],
+    WindGusts = DailyData[wind_gusts_10m_max],
+    WindDir = DailyData[wind_direction_10m_dominant],
+    SolarRad = DailyData[shortwave_radiation_sum],
+    Evapotrans = DailyData[et0_fao_evapotranspiration],
+
+    // 🔗 Combine into rows
+    ZippedList = List.Zip({
+        Dates, TempMax, TempMin, TempMean,
+        ApparentMax, ApparentMin, ApparentMean,
+        HumidityMax, HumidityMin, HumidityMean,
+        DewPoint, VapourPressure,
+        Precip, Rain, Snow, PrecipHrs,
+        CloudCover, WindSpeed, WindGusts, WindDir,
+        SolarRad, Evapotrans
+    }),
+
+    TableResult = Table.FromRows(ZippedList, {
+        "Date",
+        "TempMax_C", "TempMin_C", "TempMean_C",
+        "ApparentTempMax_C", "ApparentTempMin_C", "ApparentTempMean_C",
+        "HumidityMax_pct", "HumidityMin_pct", "HumidityMean_pct",
+        "DewPoint_C", "VapourPressureDeficit_kPa",
+        "Precipitation_mm", "Rain_mm", "Snowfall_cm", "Precip_Hours",
+        "CloudCover_pct", "WindSpeed_kmh", "WindGusts_kmh", "WindDirection_deg",
+        "SolarRadiation_MJm2", "Evapotranspiration_mm"
+    }),
+
+    // 🌍 Add location columns to every row
+    AddLatitude = Table.AddColumn(TableResult, "Latitude", each Latitude),
+    AddLongitude = Table.AddColumn(AddLatitude, "Longitude", each Longitude),
+    AddElevation = Table.AddColumn(AddLongitude, "Elevation_m", each Elevation),
+
+    // 🔧 Set data types
+    TypedTable = Table.TransformColumnTypes(AddElevation, {
+        {"Date", type date},
+        {"TempMax_C", type number},
+        {"TempMin_C", type number},
+        {"TempMean_C", type number},
+        {"ApparentTempMax_C", type number},
+        {"ApparentTempMin_C", type number},
+        {"ApparentTempMean_C", type number},
+        {"HumidityMax_pct", type number},
+        {"HumidityMin_pct", type number},
+        {"HumidityMean_pct", type number},
+        {"DewPoint_C", type number},
+        {"VapourPressureDeficit_kPa", type number},
+        {"Precipitation_mm", type number},
+        {"Rain_mm", type number},
+        {"Snowfall_cm", type number},
+        {"Precip_Hours", type number},
+        {"CloudCover_pct", type number},
+        {"WindSpeed_kmh", type number},
+        {"WindGusts_kmh", type number},
+        {"WindDirection_deg", type number},
+        {"SolarRadiation_MJm2", type number},
+        {"Evapotranspiration_mm", type number},
+        {"Latitude", type number},
+        {"Longitude", type number},
+        {"Elevation_m", type number}
+    })
+
+in
+    TypedTable
